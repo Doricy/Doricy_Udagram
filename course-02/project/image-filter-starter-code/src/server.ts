@@ -1,6 +1,9 @@
-import express from 'express';
+import express,{Request,Response} from 'express';
 import bodyParser from 'body-parser';
 import {filterImageFromURL, deleteLocalFiles} from './util/util';
+
+//axios
+const axios = require('axios');
 
 (async () => {
     // Init the Express application
@@ -24,30 +27,22 @@ import {filterImageFromURL, deleteLocalFiles} from './util/util';
     //   the filtered image file [!!TIP res.sendFile(filteredpath); might be useful]
     /**************************************************************************** */
 
-    app.get("/filteredimage", async (req, res) => {
-        //1. validate the image_url query
-        let {image_url} = req.query;
-        if (validURL(image_url)) {
-            //2. call filterImageFromURL(image_url) to filter the image
-            const filteredImage = await filterImageFromURL(image_url)
-            //3. send the resulting file in the response
-            res.sendFile(filteredImage, async (error) => {
-                if(error){
-                    //indicate it's an internal error of the server
-                    res.statusCode = 500
-                    res.send(error)
-                }else {
-                    //4. deletes any files on the server on finish of the response
-                    await deleteLocalFiles([filteredImage])
-                }
-            })
-
-        } else {
-            //indicate it's a bad request (the server cannot or will not process
-            // the request due to something that is perceived to be a client error)
-            res.statusCode = 400
-            res.send("Image URL is not Valid")
-        }
+    app.get( "/filteredimage/", ( req: Request, res: Response ) => {
+        let { image_url } = req.query;
+        if ( !image_url ) {
+          return res.status(400).send("image_url is required");
+        }    
+        filterImageFromURL(image_url)
+          .then(imagePath => {
+            return res.status(200).sendFile(imagePath, err => {
+              if (!err) {
+                let filesList: string[] = [imagePath];
+                deleteLocalFiles(filesList);
+              }
+            });
+          }).catch(() => {
+            return res.status(422).send("error when processing the image");
+          });
     });
     //! END @TODO1
 
